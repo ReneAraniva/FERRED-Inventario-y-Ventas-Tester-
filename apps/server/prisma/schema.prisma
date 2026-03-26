@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // DATABASE_URL usa pgBouncer (puerto 6543) → para queries normales
+  url       = env("DATABASE_URL")
+  // DIRECT_URL usa conexión directa (puerto 5432) → para migraciones
+  directUrl = env("DIRECT_URL")
+}
+
+model Sucursal {
+  id        Int    @id @default(autoincrement())
+  nombre    String
+  direccion String?
+  telefono  String?
+  usuarios  Usuario[]
+  facturas  FacturaDte[]
+  stocks    StockSucursal[]
+  @@map("sucursales")
+}
+
+model Categoria {
+  id          Int    @id @default(autoincrement())
+  nombre      String @unique
+  descripcion String?
+  activo      Boolean @default(true)
+  productos   Producto[]
+  @@map("categorias")
+}
+
+model Usuario {
+  id             Int      @id @default(autoincrement())
+  sucursalId     Int?     @map("sucursal_id")
+  nombre         String
+  email          String   @unique
+  contrasenaHash String   @map("contrasena_hash")
+  rol            String
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now()) @map("creado_en")
+  sucursal       Sucursal?    @relation(fields: [sucursalId], references: [id])
+  facturas       FacturaDte[]
+  syncLogs       SyncLog[]
+  @@map("usuarios")
+}
+
+model Producto {
+  id                 Int      @id @default(autoincrement())
+  categoriaId        Int?     @map("categoria_id")
+  nombre             String
+  codigoBarras       String?  @unique @map("codigo_barras")
+  tipoUnidad         String?  @map("tipo_unidad")
+  precioCompra       Float?   @map("precio_compra")
+  porcentajeGanancia Float?   @map("porcentaje_ganancia")
+  precioVenta        Float?   @map("precio_venta")
+  precioConIva       Float?   @map("precio_con_iva")
+  tieneIva           Boolean  @default(true) @map("tiene_iva")
+  stockActual        Int      @default(0) @map("stock_actual")
+  stockMinimo        Int      @default(0) @map("stock_minimo")
+  activo             Boolean  @default(true)
+  creadoEn           DateTime @default(now()) @map("creado_en")
+  categoria          Categoria?    @relation(fields: [categoriaId], references: [id])
+  detallesVenta      DetalleVenta[]
+  stocks             StockSucursal[]
+  @@map("productos")
+}
+
+model StockSucursal {
+  id            Int      @id @default(autoincrement())
+  productoId    Int      @map("producto_id")
+  sucursalId    Int      @map("sucursal_id")
+  cantidad      Int      @default(0)
+  minimo        Int      @default(0)
+  actualizadoEn DateTime @default(now()) @updatedAt @map("actualizado_en")
+  producto      Producto  @relation(fields: [productoId], references: [id])
+  sucursal      Sucursal  @relation(fields: [sucursalId], references: [id])
+  @@unique([productoId, sucursalId])
+  @@map("stock_sucursal")
+}
+
+model FacturaDte {
+  id               Int      @id @default(autoincrement())
+  sucursalId       Int?     @map("sucursal_id")
+  usuarioId        Int?     @map("usuario_id")
+  codigoGeneracion String?  @unique @map("codigo_generacion")
+  numeroControl    String?  @unique @map("numero_control")
+  tipoDte          String   @default("01") @map("tipo_dte")
+  clienteNombre    String   @default("Consumidor Final") @map("cliente_nombre")
+  totalSinIva      Float?   @map("total_sin_iva")
+  iva              Float?
+  total            Float?
+  dteJson          String?  @map("dte_json")
+  estado           String   @default("SIMULADO")
+  sincronizado     Boolean  @default(true)
+  creadoEn         DateTime @default(now()) @map("creado_en")
+  sucursal         Sucursal?    @relation(fields: [sucursalId], references: [id])
+  usuario          Usuario?     @relation(fields: [usuarioId], references: [id])
+  detalles         DetalleVenta[]
+  @@map("facturas_dte")
+}
+
+model DetalleVenta {
+  id         Int   @id @default(autoincrement())
+  facturaId  Int   @map("factura_id")
+  productoId Int   @map("producto_id")
+  cantidad   Float
+  precioUnit Float @map("precio_unit")
+  subtotal   Float
+  factura    FacturaDte @relation(fields: [facturaId], references: [id])
+  producto   Producto   @relation(fields: [productoId], references: [id])
+  @@map("detalles_venta")
+}
+
+model SyncLog {
+  id        Int       @id @default(autoincrement())
+  usuarioId Int?      @map("usuario_id")
+  tabla     String
+  operacion String
+  payload   String
+  status    String    @default("PENDIENTE")
+  intentos  Int       @default(0)
+  error     String?
+  creadoEn  DateTime  @default(now()) @map("creado_en")
+  sincEn    DateTime? @map("sinc_en")
+  usuario   Usuario?  @relation(fields: [usuarioId], references: [id])
+  @@map("sync_log")
+}
