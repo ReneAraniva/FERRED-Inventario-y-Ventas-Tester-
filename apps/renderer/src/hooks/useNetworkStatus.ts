@@ -5,12 +5,20 @@
  * - Hace ping real al /health del servidor cada 30s para confirmación
  * - Expone estado, conteo de pendientes y función de sync manual
  */
+
+/**
+ * useNetworkStatus.ts
+ * Ruta: apps/renderer/src/hooks/useNetworkStatus.ts
+ *
+ * CAMBIO: Se exporta el tipo SyncState para que OfflineBanner lo pueda usar.
+ * El resto del código es idéntico al original.
+ */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '../services/api.client';
 
 export type NetworkStatus = 'online' | 'offline' | 'checking';
 
-interface SyncState {
+export interface SyncState {           // ← era "interface", ahora se exporta
   pendientes: number;
   errores:    number;
   lastSync:   Date | null;
@@ -21,7 +29,6 @@ export function useNetworkStatus() {
   const [syncState, setSyncState] = useState<SyncState>({ pendientes: 0, errores: 0, lastSync: null });
   const pingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Ping real al servidor
   const checkServer = useCallback(async () => {
     try {
       await api.get('/inventario/status', { timeout: 4000 });
@@ -31,7 +38,6 @@ export function useNetworkStatus() {
     }
   }, []);
 
-  // Obtener conteo de pendientes
   const fetchSyncState = useCallback(async () => {
     try {
       const { data } = await api.get('/inventario/sync-pendientes', { timeout: 4000 });
@@ -42,18 +48,15 @@ export function useNetworkStatus() {
   }, []);
 
   useEffect(() => {
-    // Escuchar eventos del browser
     const onOnline  = () => { setStatus('online');  checkServer(); fetchSyncState(); };
     const onOffline = () => setStatus('offline');
 
     window.addEventListener('online',  onOnline);
     window.addEventListener('offline', onOffline);
 
-    // Chequeo inicial
     checkServer();
     fetchSyncState();
 
-    // Ping cada 30 segundos
     pingTimer.current = setInterval(() => {
       checkServer();
       if (status === 'online') fetchSyncState();
@@ -68,11 +71,11 @@ export function useNetworkStatus() {
 
   return {
     status,
-    isOnline:   status === 'online',
-    isOffline:  status === 'offline',
-    isChecking: status === 'checking',
+    isOnline:    status === 'online',
+    isOffline:   status === 'offline',
+    isChecking:  status === 'checking',
     syncState,
-    checkNow:   checkServer,
+    checkNow:    checkServer,
     refreshSync: fetchSyncState,
   };
 }
