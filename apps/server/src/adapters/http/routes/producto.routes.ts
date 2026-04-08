@@ -70,12 +70,12 @@ productoRoutes.get('/', async (req: Request, res: Response, next: NextFunction) 
 
     let resultado = productos;
     if (criticos === 'true' && targetSucursalId) {
-      resultado = productos.filter(p => {
+      resultado = productos.filter((p: any) => {
         const s = (p as any).stocks?.[0];
         return s ? s.cantidad <= s.minimo : p.stockActual <= p.stockMinimo;
       });
     } else if (criticos === 'true') {
-      resultado = productos.filter(p => p.stockActual <= p.stockMinimo);
+      resultado = productos.filter((p: any) => p.stockActual <= p.stockMinimo);
     }
 
     OfflineCache.set(cacheKey, resultado);

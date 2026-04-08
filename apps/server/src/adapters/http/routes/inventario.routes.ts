@@ -208,8 +208,8 @@ inventarioRoutes.get(
         orderBy: { nombre: 'asc' },
       });
 
-      const resultado = productos.map(p => {
-        const sucursales = p.stocks.map(s => ({
+      const resultado = productos.map((p: any) => {
+        const sucursales = p.stocks.map((s: any) => ({
           sucursalId:     s.sucursalId,
           sucursalNombre: s.sucursal.nombre,
           cantidad:       s.cantidad,
@@ -220,7 +220,7 @@ inventarioRoutes.get(
                                       'disponible',
         }));
 
-        const stockTotal = sucursales.reduce((acc, s) => acc + s.cantidad, 0);
+        const stockTotal = sucursales.reduce((acc: number, s: any) => acc + s.cantidad, 0);
 
         return {
           id:           p.id,
@@ -304,7 +304,7 @@ inventarioRoutes.get('/stock-bajo', async (req: Request, res: Response, next: Ne
       orderBy: { cantidad: 'asc' },
     });
 
-    return res.json(criticos.map(c => ({
+    return res.json(criticos.map((c: any) => ({
       id:         c.productoId,
       nombre:     c.producto.nombre,
       tipoUnidad: c.producto.tipoUnidad,

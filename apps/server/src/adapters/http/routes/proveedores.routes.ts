@@ -56,7 +56,7 @@ proveedoresRoutes.post(
       const resultados = [];
 
       for (const item of items) {
-        const producto = productos.find(p => p.id === item.productoId)!;
+        const producto = productos.find((p: any) => p.id === item.productoId)!;
 
         // Incrementar stock en la sucursal
         const stockActualizado = await prisma.stockSucursal.upsert({
@@ -135,14 +135,14 @@ proveedoresRoutes.get(
 
       // Filtrar solo los que son recepciones y de la sucursal del usuario
       const recepciones = logs
-        .map(log => {
+        .map((log: any) => {
           try { return { ...log, payloadObj: JSON.parse(log.payload) }; }
           catch { return null; }
         })
-        .filter(log => log !== null && log.payloadObj?.esRecepcion === true)
-        .filter(log => esAdmin || log!.payloadObj?.sucursalId === sucursalId);
+        .filter((log: any) => log !== null && log.payloadObj?.esRecepcion === true)
+        .filter((log: any) => esAdmin || log!.payloadObj?.sucursalId === sucursalId);
 
-      return res.json(recepciones.map(log => ({
+      return res.json(recepciones.map((log: any) => ({
         id:               log!.id,
         fecha:            log!.creadoEn,
         bodeguero:        log!.usuario?.nombre ?? 'Sistema',

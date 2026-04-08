@@ -17,6 +17,7 @@ import { jwtMiddleware }      from './adapters/http/middleware/jwt.middleware';
 import { SyncService }        from './adapters/sync/sync.service';
 import { ventasRoutes }       from './adapters/http/routes/ventas.routes';
 import { proveedoresRoutes }  from './adapters/http/routes/proveedores.routes';
+import { AlertasService } from './alertas/alertas.service';
 
 const app = express();
 const branchId = process.env.BRANCH_ID || '1';
@@ -75,3 +76,4 @@ app.listen(PORT, () => {
 });
 
 SyncService.start();
+AlertasService.start();
