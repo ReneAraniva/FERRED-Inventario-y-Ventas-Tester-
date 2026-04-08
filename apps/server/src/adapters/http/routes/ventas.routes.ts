@@ -72,7 +72,7 @@ ventasRoutes.post('/', async (req: Request, res: Response, next: NextFunction) =
     const errores: string[] = [];
 
     for (const item of items) {
-      const producto = productos.find(p => p.id === item.productoId)!;
+      const producto = productos.find((p: any) => p.id === item.productoId)!;
       const stock    = producto.stocks[0];
 
       // T-09B.3: validar cantidad vs tipoUnidad
@@ -99,7 +99,7 @@ ventasRoutes.post('/', async (req: Request, res: Response, next: NextFunction) =
     const subtotalFix = parseFloat(subtotal.toFixed(2));
 
     // 4. Transacción atómica: factura + detalles + descuento de stock
-    const factura = await prisma.$transaction(async (tx) => {
+    const factura = await prisma.$transaction(async (tx: any) => {
       // 4a. Crear factura DTE
       const nuevaFactura = await tx.facturaDte.create({
         data: {
@@ -207,7 +207,7 @@ ventasRoutes.get('/:id/ticket', async (req: Request, res: Response, next: NextFu
       clienteNombre:  factura.clienteNombre,
       tipoDte:        factura.tipoDte,
       estado:         factura.estado,
-      items: factura.detalles.map(d => ({
+      items: factura.detalles.map((d: any) => ({
         nombre:     d.producto.nombre,
         tipoUnidad: d.producto.tipoUnidad,
         cantidad:   d.cantidad,

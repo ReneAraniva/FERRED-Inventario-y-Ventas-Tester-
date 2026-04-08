@@ -17,7 +17,7 @@ categoriaRoutes.get('/', async (_req: Request, res: Response, next: NextFunction
       include: { _count: { select: { productos: true } } },
       orderBy: { nombre: 'asc' },
     });
-    return res.json(categorias.map(c => ({
+    return res.json(categorias.map((c: any) => ({
       id: c.id, nombre: c.nombre, descripcion: c.descripcion,
       nProductos: c._count.productos,
     })));
