@@ -1,9 +1,13 @@
 /**
  * Topbar.tsx
- * T-07.3: Muestra indicador de conectividad en tiempo real
- * Muestra badge de pendientes de sync cuando hay registros sin subir
+ * T-07.3: Indicador de conectividad ampliado
+ *
+ * CAMBIOS:
+ * 1. Online + pendientes > 0  → badge naranja con conteo
+ * 2. Sync completada          → confirmación verde "Sincronizado ✓" por 3 segundos
  */
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
@@ -14,6 +18,29 @@ export function Topbar() {
   const { isDark, toggleTheme } = useThemeStore();
   const { status, isOnline, syncState } = useNetworkStatus();
 
+  // ── Lógica de confirmación post-sync ──────────────────────
+  const [showSynced, setShowSynced] = useState(false);
+  const prevPendientes = useRef<number>(syncState.pendientes);
+  const syncTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const prev = prevPendientes.current;
+    const curr = syncState.pendientes;
+
+    // Si había pendientes y ahora no hay → sync completada
+    if (prev > 0 && curr === 0 && isOnline) {
+      setShowSynced(true);
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+      syncTimer.current = setTimeout(() => setShowSynced(false), 3000);
+    }
+
+    prevPendientes.current = curr;
+
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+  }, [syncState.pendientes, isOnline]);
+
   function handleLogout() { logout(); navigate('/login'); }
 
   const initials = (name: string) =>
@@ -21,17 +48,25 @@ export function Topbar() {
 
   // ── Indicador de red ────────────────────────────────────────
   const NetIndicator = () => {
+
+    // 1. Verificando
     if (status === 'checking') return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--warning)', animation: 'pulse 1s infinite' }} />
+        <div style={{
+          width: '7px', height: '7px', borderRadius: '50%',
+          background: 'var(--warning)', animation: 'pulse 1s infinite',
+        }} />
         <span style={{ fontSize: '11px', color: 'var(--warning)' }}>Verificando...</span>
       </div>
     );
 
+    // 2. Sin conexión
     if (!isOnline) return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px',
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '5px',
         padding: '4px 10px', background: 'rgba(239,68,68,0.1)',
-        border: '1px solid rgba(239,68,68,0.25)', borderRadius: '20px' }}>
+        border: '1px solid rgba(239,68,68,0.25)', borderRadius: '20px',
+      }}>
         <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--danger)' }} />
         <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--danger)' }}>Sin conexión</span>
         {syncState.pendientes > 0 && (
@@ -42,22 +77,53 @@ export function Topbar() {
       </div>
     );
 
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px',
-        padding: '4px 10px', background: 'rgba(16,185,129,0.08)',
-        border: '1px solid rgba(16,185,129,0.2)', borderRadius: '20px' }}>
-        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--success)' }} />
-        <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--success)' }}>En línea</span>
-        {syncState.pendientes > 0 && (
-          <span style={{ fontSize: '10px', color: 'var(--warning)', fontWeight: 700 }}>
-            · {syncState.pendientes} por sincronizar
-          </span>
-        )}
+    // 3. Online + confirmación de sync completada (3 segundos)
+    if (showSynced) return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '5px',
+        padding: '4px 10px', background: 'rgba(16,185,129,0.15)',
+        border: '1px solid rgba(16,185,129,0.4)', borderRadius: '20px',
+        animation: 'pulse 0.4s ease',
+      }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+          stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--success)' }}>
+          Sincronizado
+        </span>
+      </div>
+    );
+
+    // 4. Online + pendientes en naranja 🆕
+    if (syncState.pendientes > 0) return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '5px',
+        padding: '4px 10px', background: 'rgba(245,158,11,0.1)',
+        border: '1px solid rgba(245,158,11,0.35)', borderRadius: '20px',
+      }}>
+        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--warning)', animation: 'pulse 1.5s infinite' }} />
+        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--warning)' }}>En línea</span>
+        <span style={{ fontSize: '10px', color: 'var(--warning)', fontWeight: 700 }}>
+          · {syncState.pendientes} por sincronizar
+        </span>
         {syncState.errores > 0 && (
           <span style={{ fontSize: '10px', color: 'var(--danger)', fontWeight: 700 }}>
             · {syncState.errores} errores
           </span>
         )}
+      </div>
+    );
+
+    // 5. Online sin pendientes — estado normal
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '5px',
+        padding: '4px 10px', background: 'rgba(16,185,129,0.08)',
+        border: '1px solid rgba(16,185,129,0.2)', borderRadius: '20px',
+      }}>
+        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--success)' }} />
+        <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--success)' }}>En línea</span>
       </div>
     );
   };
@@ -83,7 +149,7 @@ export function Topbar() {
 
       <div style={{ flex: 1 }} />
 
-      {/* Indicador de red — oculto en xs */}
+      {/* Indicador de red */}
       <div className="hide-xs">
         <NetIndicator />
       </div>
