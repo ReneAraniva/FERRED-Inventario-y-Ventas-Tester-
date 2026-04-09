@@ -3,6 +3,7 @@ import { useNetworkStatus } from './hooks/useNetworkStatus';
 import { useThemeStore }    from './store/themeStore';
 import { AppRouter }        from './router/AppRouter';
 
+
 export default function App() {
   const { status }               = useNetworkStatus();
   const { isDark }               = useThemeStore();
