@@ -364,7 +364,7 @@ export default function LoginPage() {
               fontSize: '9px', letterSpacing: '0.12em', color: T.footerColor,
               fontFamily: "'Georgia',serif", flexShrink: 0,
             }}>
-              © 2026 Ferred — Sistema de Gestión v2.4
+              © 2026 Ferred — Sistema de Gestión v1.0.2
             </footer>
             <div style={{ height: '2px', background: T.accentBar, flexShrink: 0 }} />
           </main>
