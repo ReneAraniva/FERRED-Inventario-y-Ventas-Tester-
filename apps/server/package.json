@@ -14,7 +14,7 @@
     "railway-build": "pnpm install && pnpm build"
   },
   "dependencies": {
-    "@prisma/client": "^5.14.0",
+    "@prisma/client": "^5.22.0",
     "axios": "^1.7.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
@@ -36,7 +36,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/qrcode": "^1.5.6",
     "dotenv-cli": "^7.4.2",
-    "prisma": "^5.14.0",
+    "prisma": "^5.22.0",
     "tsx": "^4.15.6",
     "typescript": "^5.4.5"
   }
