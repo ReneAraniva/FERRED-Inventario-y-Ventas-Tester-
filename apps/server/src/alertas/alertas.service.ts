@@ -12,6 +12,10 @@ const ANTI_SPAM_MS = 60 * 60 * 1000;  // no re-alertar en 1 hora
 // Registro en memoria de ultimas alertas enviadas
 const ultimaAlerta = new Map<string, number>();
 
+function getMinimoEfectivo(stock: { minimo: number; producto: { stockMinimo: number } }): number {
+  return stock.minimo > 0 ? stock.minimo : stock.producto.stockMinimo;
+}
+
 function crearTransporte() {
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
     return nodemailer.createTransport({
@@ -91,7 +95,7 @@ async function checkStock(): Promise<void> {
     });
 
     const bajoMinimo = todos.filter(
-      (c: any) => c.producto.activo && c.cantidad <= c.minimo
+      (c: any) => c.producto.activo && c.cantidad <= getMinimoEfectivo(c)
     );
 
     if (bajoMinimo.length === 0) return;
@@ -130,7 +134,7 @@ async function checkStock(): Promise<void> {
             productoId: i.productoId,
             nombre:     i.producto.nombre,
             cantidad:   i.cantidad,
-            minimo:     i.minimo,
+            minimo:     getMinimoEfectivo(i),
             sucursalId,
           }))),
           status: 'SINCRONIZADO',
@@ -142,7 +146,7 @@ async function checkStock(): Promise<void> {
       const productosInfo  = paraAlertar.map((i: any) => ({
         nombre:   i.producto.nombre,
         cantidad: i.cantidad,
-        minimo:   i.minimo,
+        minimo:   getMinimoEfectivo(i),
         estado:   i.cantidad === 0 ? 'critico' : 'bajo',
       }));
 

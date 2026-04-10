@@ -189,6 +189,18 @@ export async function enviarDteHacienda(facturaId: number): Promise<{
     // Intentar enviar al Sandbox de Hacienda
     let estadoFinal = 'SIMULADO';
     let selloRecibido: string | undefined;
+    const authToken = env.dte.authToken.trim();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (authToken) {
+      headers.Authorization = authToken.startsWith('Bearer ')
+        ? authToken
+        : `Bearer ${authToken}`;
+    } else if (env.dte.env === 'sandbox') {
+      console.warn('[DTE] DTE_AUTH_TOKEN no configurado; Hacienda puede responder 401');
+    }
 
     try {
       const response = await axios.post(
@@ -201,7 +213,7 @@ export async function enviarDteHacienda(facturaId: number): Promise<{
           documento:        Buffer.from(JSON.stringify(dteJson)).toString('base64'),
           codigoGeneracion,
         },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+        { headers, timeout: 10000 }
       );
 
       if (response.data?.estado === 'PROCESADO') {
@@ -217,7 +229,20 @@ export async function enviarDteHacienda(facturaId: number): Promise<{
         return { ok: false, estado: estadoFinal, error: errMsg };
       }
     } catch (axiosErr: any) {
-      // Sandbox no disponible — marcar como SIMULADO (no bloquear la venta)
+      const status = axiosErr?.response?.status as number | undefined;
+      if (status) {
+        estadoFinal = 'ERROR_HACIENDA';
+        const detalle = axiosErr?.response?.data
+          ? JSON.stringify(axiosErr.response.data)
+          : axiosErr.message;
+        await prisma.facturaDte.update({
+          where: { id: facturaId },
+          data:  { estado: estadoFinal },
+        });
+        return { ok: false, estado: estadoFinal, error: `HTTP ${status}: ${detalle}` };
+      }
+
+      // Sandbox no disponible (red/timeout) — marcar como SIMULADO para no bloquear la venta
       estadoFinal = 'SIMULADO';
       console.warn('[DTE] Sandbox no disponible — modo SIMULADO:', axiosErr.message);
     }
