@@ -17,7 +17,8 @@ import { jwtMiddleware }      from './adapters/http/middleware/jwt.middleware';
 import { SyncService }        from './adapters/sync/sync.service';
 import { ventasRoutes }       from './adapters/http/routes/ventas.routes';
 import { proveedoresRoutes }  from './adapters/http/routes/proveedores.routes';
-import { AlertasService } from './alertas/alertas.service';
+import { AlertasService }     from './alertas/alertas.service';
+import { dteRoutes }          from './adapters/dte/routes';
 
 const app = express();
 const branchId = process.env.BRANCH_ID || '1';
@@ -60,6 +61,7 @@ app.get('/health', (_req, res) => res.json({ ok: true, branch: branchId }));
 
 // Rutas protegidas con JWT
 app.use(jwtMiddleware);
+app.use('/api/dte', dteRoutes);
 app.use('/api/usuarios',    usuarioRoutes);
 app.use('/api/categorias',  categoriaRoutes);
 app.use('/api/productos',   productoRoutes);
