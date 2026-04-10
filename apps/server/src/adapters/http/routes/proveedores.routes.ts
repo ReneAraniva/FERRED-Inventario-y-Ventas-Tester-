@@ -61,8 +61,16 @@ proveedoresRoutes.post(
         // Incrementar stock en la sucursal
         const stockActualizado = await prisma.stockSucursal.upsert({
           where:  { productoId_sucursalId: { productoId: item.productoId, sucursalId } },
-          create: { productoId: item.productoId, sucursalId, cantidad: item.cantidadRecibida, minimo: 0 },
-          update: { cantidad: { increment: item.cantidadRecibida } },
+          create: {
+            productoId: item.productoId,
+            sucursalId,
+            cantidad: item.cantidadRecibida,
+            minimo: producto.stockMinimo,
+          },
+          update: {
+            cantidad: { increment: item.cantidadRecibida },
+            minimo: producto.stockMinimo,
+          },
         });
 
         // Sincronizar stock_actual del producto
@@ -121,6 +129,7 @@ proveedoresRoutes.get(
       const where: any = {
         tabla:     'stockSucursal',
         operacion: 'UPDATE',
+        payload:   { contains: '"esRecepcion":true' },
       };
 
       if (desde) where.creadoEn = { ...where.creadoEn, gte: new Date(desde) };

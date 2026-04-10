@@ -25,7 +25,10 @@ export interface SyncState {           // ← era "interface", ahora se exporta
 }
 
 export function useNetworkStatus() {
-  const [status,    setStatus]    = useState<NetworkStatus>('checking');
+  // Usar navigator.onLine como estado inicial para evitar el flash de "online"
+  // cuando en realidad no hay conexión al recargar la página
+  const initialStatus: NetworkStatus = navigator.onLine ? 'checking' : 'offline';
+  const [status,    setStatus]    = useState<NetworkStatus>(initialStatus);
   const [syncState, setSyncState] = useState<SyncState>({ pendientes: 0, errores: 0, lastSync: null });
   const pingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
