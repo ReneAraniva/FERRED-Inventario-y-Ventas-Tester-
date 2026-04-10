@@ -5,6 +5,7 @@
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { prisma }          from '../../db/prisma/prisma.client';
 import { logPendiente }    from '../../sync/sync.service';
 import { sincronizarStockTotal } from './inventario.routes';
@@ -169,6 +170,100 @@ ventasRoutes.post('/', async (req: Request, res: Response, next: NextFunction) =
       resumen: { subtotal: subtotalFix, iva, total },
     });
 
+  } catch (err) { return next(err); }
+});
+
+// ── GET /api/ventas ───────────────────────────────────────────
+// Historial de ventas con filtros por fecha/estado/sucursal
+ventasRoutes.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      desde,
+      hasta,
+      estado,
+      sucursalId,
+      pagina = '1',
+      limite = '50',
+    } = req.query as Record<string, string | undefined>;
+
+    const page = Math.max(Number(pagina) || 1, 1);
+    const take = Math.min(Math.max(Number(limite) || 50, 1), 100);
+    const skip = (page - 1) * take;
+
+    const where: Prisma.FacturaDteWhereInput = {};
+
+    if (estado) where.estado = estado;
+
+    if (desde || hasta) {
+      const creadoEn: Prisma.DateTimeFilter = {};
+
+      if (desde) {
+        const fechaDesde = new Date(desde);
+        if (Number.isNaN(fechaDesde.getTime())) {
+          return res.status(400).json({ error: 'Parámetro "desde" inválido (usa YYYY-MM-DD)' });
+        }
+        creadoEn.gte = fechaDesde;
+      }
+
+      if (hasta) {
+        const fechaHasta = new Date(hasta);
+        if (Number.isNaN(fechaHasta.getTime())) {
+          return res.status(400).json({ error: 'Parámetro "hasta" inválido (usa YYYY-MM-DD)' });
+        }
+        fechaHasta.setHours(23, 59, 59, 999);
+        creadoEn.lte = fechaHasta;
+      }
+
+      where.creadoEn = creadoEn;
+    }
+
+    const usuario = req.usuario;
+    if (usuario?.rol !== 'ADMIN') {
+      where.sucursalId = usuario?.sucursalId;
+    } else if (sucursalId) {
+      const sid = Number(sucursalId);
+      if (!Number.isInteger(sid) || sid <= 0) {
+        return res.status(400).json({ error: 'sucursalId inválido' });
+      }
+      where.sucursalId = sid;
+    }
+
+    const [total, ventas] = await prisma.$transaction([
+      prisma.facturaDte.count({ where }),
+      prisma.facturaDte.findMany({
+        where,
+        orderBy: { creadoEn: 'desc' },
+        skip,
+        take,
+        include: {
+          sucursal: { select: { id: true, nombre: true } },
+          usuario:  { select: { id: true, nombre: true } },
+          _count:   { select: { detalles: true } },
+        },
+      }),
+    ]);
+
+    return res.json({
+      total,
+      pagina: page,
+      limite: take,
+      totalPaginas: Math.max(Math.ceil(total / take), 1),
+      ventas: ventas.map(v => ({
+        id:            v.id,
+        fecha:         v.creadoEn,
+        sucursalId:    v.sucursalId,
+        sucursal:      v.sucursal?.nombre ?? null,
+        usuarioId:     v.usuarioId,
+        usuario:       v.usuario?.nombre ?? 'Sistema',
+        clienteNombre: v.clienteNombre,
+        tipoDte:       v.tipoDte,
+        estado:        v.estado,
+        totalSinIva:   v.totalSinIva,
+        iva:           v.iva,
+        total:         v.total,
+        items:         v._count.detalles,
+      })),
+    });
   } catch (err) { return next(err); }
 });
 

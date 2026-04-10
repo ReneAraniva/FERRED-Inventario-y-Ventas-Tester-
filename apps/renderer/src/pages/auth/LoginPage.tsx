@@ -331,11 +331,7 @@ export default function LoginPage() {
                     {showPass ? <IconEyeOff color={T.eyeColor} /> : <IconEyeOn color={T.eyeColor} />}
                   </button>
                 </div>
-                <div style={{ textAlign: 'right', marginTop: '8px' }}>
-                  <a href="#" className="ff-forgot" style={{ fontSize: '11px', color: T.forgotColor, textDecoration: 'none', fontStyle: 'italic' }}>
-                    ¿Olvidaste tu contraseña?
-                  </a>
-                </div>
+                
               </div>
 
               <button type="submit" className="ff-btn" disabled={loading} style={{
@@ -364,7 +360,7 @@ export default function LoginPage() {
               fontSize: '9px', letterSpacing: '0.12em', color: T.footerColor,
               fontFamily: "'Georgia',serif", flexShrink: 0,
             }}>
-              © 2026 Ferred — Sistema de Gestión v1.0.2
+              © 2026 Ferred — Sistema de Gestión v1.2.3
             </footer>
             <div style={{ height: '2px', background: T.accentBar, flexShrink: 0 }} />
           </main>
