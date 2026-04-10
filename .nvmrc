@@ -1,8 +1,1 @@
-echo "22" > .nvmrc
-
-# Activar esa versión
-nvm install 22
-nvm use 22
-
-# Verificar
-node -v  # debe decir v22.x.x
+22

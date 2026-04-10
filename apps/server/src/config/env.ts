@@ -38,6 +38,6 @@ export const env = {
   dte: {
     env:        process.env.DTE_ENV ?? 'sandbox',
     sandboxUrl: process.env.DTE_SANDBOX_URL ?? 'https://apitest.dtes.mh.gob.sv',
+    authToken:  process.env.DTE_AUTH_TOKEN ?? process.env.DTE_SANDBOX_TOKEN ?? '',
   },
 } as const;
-
