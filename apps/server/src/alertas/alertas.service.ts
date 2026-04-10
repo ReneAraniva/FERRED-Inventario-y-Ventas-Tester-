@@ -91,8 +91,8 @@ async function checkStock(): Promise<void> {
     });
 
     const bajoMinimo = todos.filter(
-      (c: any) => c.producto.activo && c.cantidad <= c.minimo
-    );
+  (c: any) => c.producto.activo && c.cantidad <= c.producto.stockMinimo
+);
 
     if (bajoMinimo.length === 0) return;
 
@@ -130,7 +130,7 @@ async function checkStock(): Promise<void> {
             productoId: i.productoId,
             nombre:     i.producto.nombre,
             cantidad:   i.cantidad,
-            minimo:     i.minimo,
+            minimo:     i.producto.stockMinimo,
             sucursalId,
           }))),
           status: 'SINCRONIZADO',
@@ -142,7 +142,7 @@ async function checkStock(): Promise<void> {
       const productosInfo  = paraAlertar.map((i: any) => ({
         nombre:   i.producto.nombre,
         cantidad: i.cantidad,
-        minimo:   i.minimo,
+        minimo:   i.producto.stockMinimo,
         estado:   i.cantidad === 0 ? 'critico' : 'bajo',
       }));
 
