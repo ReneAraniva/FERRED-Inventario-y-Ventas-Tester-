@@ -5,6 +5,34 @@ import { logPendiente, OfflineCache, SyncService } from '../../sync/sync.service
 
 export const inventarioRoutes = Router();
 
+type CriticoSucursalRow = {
+  id: number;
+  productoId: number;
+  sucursalId: number;
+  cantidad: number;
+  minimo: number;
+  actualizadoEn: Date;
+  nombre: string;
+  tipoUnidad: string | null;
+};
+
+type StockBajoAdminRow = {
+  productoId: number;
+  cantidad: number;
+  minimo: number;
+  nombre: string;
+  tipoUnidad: string | null;
+  sucursalNombre: string;
+};
+
+type StockBajoSucursalRow = {
+  productoId: number;
+  cantidad: number;
+  minimo: number;
+  nombre: string;
+  tipoUnidad: string | null;
+};
+
 export async function sincronizarStockTotal(productoId: number): Promise<void> {
   const resultado = await prisma.stockSucursal.aggregate({
     where: { productoId },
@@ -71,17 +99,33 @@ inventarioRoutes.get('/criticos/:sucursalId', async (req: Request, res: Response
   try {
     const sucursalId = Number(req.params.sucursalId);
 
-    const criticos = await prisma.stockSucursal.findMany({
-      where: {
-        sucursalId,
-        producto: { activo: true },
-        cantidad:  { lte: prisma.stockSucursal.fields.minimo as any },
-      },
-      include: {
-        producto: { select: { nombre: true, tipoUnidad: true } },
-      },
-      orderBy: { cantidad: 'asc' },
-    });
+    const criticosRows = await prisma.$queryRaw<CriticoSucursalRow[]>`
+      SELECT
+        ss.id,
+        ss.producto_id AS "productoId",
+        ss.sucursal_id AS "sucursalId",
+        ss.cantidad,
+        ss.minimo,
+        ss.actualizado_en AS "actualizadoEn",
+        p.nombre,
+        p.tipo_unidad AS "tipoUnidad"
+      FROM stock_sucursal ss
+      INNER JOIN productos p ON p.id = ss.producto_id
+      WHERE ss.sucursal_id = ${sucursalId}
+        AND p.activo = ${true}
+        AND ss.cantidad <= ss.minimo
+      ORDER BY ss.cantidad ASC
+    `;
+
+    const criticos = criticosRows.map(c => ({
+      id: c.id,
+      productoId: c.productoId,
+      sucursalId: c.sucursalId,
+      cantidad: c.cantidad,
+      minimo: c.minimo,
+      actualizadoEn: c.actualizadoEn,
+      producto: { nombre: c.nombre, tipoUnidad: c.tipoUnidad },
+    }));
 
     return res.json({ total: criticos.length, criticos });
   } catch (err) { return next(err); }
@@ -97,17 +141,35 @@ inventarioRoutes.patch(
       const productoId = Number(req.params.productoId);
       const sucursalId = Number(req.body.sucursalId);
       const cantidad   = Number(req.body.cantidad);
-      const minimo     = Number(req.body.minimo ?? 0);
+      const minimoInput = req.body.minimo;
+      const minimo = minimoInput !== undefined ? Number(minimoInput) : undefined;
       const motivo     = req.body.motivo as string | undefined;
 
       if (!Number.isFinite(cantidad)) return res.status(400).json({ error: 'cantidad inválida' });
+      if (minimo !== undefined && (!Number.isFinite(minimo) || minimo < 0)) {
+        return res.status(400).json({ error: 'minimo inválido' });
+      }
       if (!sucursalId)                return res.status(400).json({ error: 'sucursalId requerido' });
+
+      const producto = await prisma.producto.findUnique({
+        where:  { id: productoId },
+        select: { stockMinimo: true },
+      });
+      if (!producto) return res.status(404).json({ error: 'Producto no encontrado' });
 
       // crea el registro si no existe aún para esta sucursal
       const stock = await prisma.stockSucursal.upsert({
         where:  { productoId_sucursalId: { productoId, sucursalId } },
-        create: { productoId, sucursalId, cantidad: Math.max(0, cantidad), minimo },
-        update: { cantidad, minimo },
+        create: {
+          productoId,
+          sucursalId,
+          cantidad: Math.max(0, cantidad),
+          minimo: minimo ?? producto.stockMinimo,
+        },
+        update: {
+          cantidad,
+          ...(minimo !== undefined ? { minimo } : {}),
+        },
       });
 
       // sincronizar stock_actual como SUMA de todas las sucursales
@@ -116,7 +178,7 @@ inventarioRoutes.patch(
       // Registrar para sync si estamos offline
       await logPendiente('stockSucursal', 'UPDATE', {
         id: stock.id, productoId, sucursalId, cantidad: stock.cantidad, motivo,
-      }, (req as any).user?.id);
+      }, req.usuario?.id);
 
       OfflineCache.invalidate(`stock:${sucursalId}`);
       return res.json({ ok: true, stock, stockTotal: await getStockTotal(productoId) });
@@ -142,6 +204,14 @@ inventarioRoutes.post(
         return res.status(400).json({ error: 'Datos de transferencia inválidos' });
       }
 
+      const producto = await prisma.producto.findUnique({
+        where:  { id: productoId },
+        select: { activo: true, stockMinimo: true },
+      });
+      if (!producto || !producto.activo) {
+        return res.status(404).json({ error: 'Producto no existe o está inactivo' });
+      }
+
       // Verificar stock suficiente en origen
       const origen = await prisma.stockSucursal.findUnique({
         where: { productoId_sucursalId: { productoId, sucursalId: origenId } },
@@ -161,7 +231,7 @@ inventarioRoutes.post(
         }),
         prisma.stockSucursal.upsert({
           where:  { productoId_sucursalId: { productoId, sucursalId: destinoId } },
-          create: { productoId, sucursalId: destinoId, cantidad, minimo: 0 },
+          create: { productoId, sucursalId: destinoId, cantidad, minimo: producto.stockMinimo },
           update: { cantidad: { increment: cantidad } },
         }),
       ]);
@@ -208,8 +278,8 @@ inventarioRoutes.get(
         orderBy: { nombre: 'asc' },
       });
 
-      const resultado = productos.map((p: any) => {
-        const sucursales = p.stocks.map((s: any) => ({
+      const resultado = productos.map(p => {
+        const sucursales = p.stocks.map(s => ({
           sucursalId:     s.sucursalId,
           sucursalNombre: s.sucursal.nombre,
           cantidad:       s.cantidad,
@@ -220,7 +290,7 @@ inventarioRoutes.get(
                                       'disponible',
         }));
 
-        const stockTotal = sucursales.reduce((acc: number, s: any) => acc + s.cantidad, 0);
+        const stockTotal = sucursales.reduce((acc, s) => acc + s.cantidad, 0);
 
         return {
           id:           p.id,
@@ -245,26 +315,27 @@ inventarioRoutes.get(
 // ADMIN -> ve ambas sucursales | CAJERO/BODEGA -> solo su sucursal
 inventarioRoutes.get('/stock-bajo', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const usuario    = (req as any).usuario;
+    const usuario    = req.usuario;
     const esAdmin    = usuario?.rol === 'ADMIN';
     const sucursalId = usuario?.sucursalId;
 
     if (esAdmin) {
       // Admin ve todos los productos con stock crítico en CUALQUIER sucursal
-      const criticos = await prisma.stockSucursal.findMany({
-        where: {
-          OR: [
-            { cantidad: 0 },
-            { cantidad: { lte: prisma.stockSucursal.fields.minimo as any } },
-          ],
-          producto: { activo: true },
-        },
-        include: {
-          producto:  { select: { nombre: true, tipoUnidad: true } },
-          sucursal:  { select: { nombre: true } },
-        },
-        orderBy: { cantidad: 'asc' },
-      });
+      const criticos = await prisma.$queryRaw<StockBajoAdminRow[]>`
+        SELECT
+          ss.producto_id AS "productoId",
+          ss.cantidad,
+          ss.minimo,
+          p.nombre,
+          p.tipo_unidad AS "tipoUnidad",
+          s.nombre AS "sucursalNombre"
+        FROM stock_sucursal ss
+        INNER JOIN productos p ON p.id = ss.producto_id
+        INNER JOIN sucursales s ON s.id = ss.sucursal_id
+        WHERE p.activo = ${true}
+          AND (ss.cantidad = 0 OR ss.cantidad <= ss.minimo)
+        ORDER BY ss.cantidad ASC
+      `;
 
       // Agrupar por producto para no duplicar
       const porProducto = new Map<number, any>();
@@ -272,13 +343,13 @@ inventarioRoutes.get('/stock-bajo', async (req: Request, res: Response, next: Ne
         if (!porProducto.has(c.productoId)) {
           porProducto.set(c.productoId, {
             id:          c.productoId,
-            nombre:      c.producto.nombre,
-            tipoUnidad:  c.producto.tipoUnidad,
+            nombre:      c.nombre,
+            tipoUnidad:  c.tipoUnidad,
             sucursales:  [],
           });
         }
         porProducto.get(c.productoId).sucursales.push({
-          sucursalNombre: c.sucursal.nombre,
+          sucursalNombre: c.sucursalNombre,
           cantidad:       c.cantidad,
           minimo:         c.minimo,
           estado:         c.cantidad === 0 ? 'critico' : 'bajo',
@@ -289,25 +360,25 @@ inventarioRoutes.get('/stock-bajo', async (req: Request, res: Response, next: Ne
     }
 
     // No-admin: solo su sucursal
-    const criticos = await prisma.stockSucursal.findMany({
-      where: {
-        sucursalId,
-        producto: { activo: true },
-        OR: [
-          { cantidad: 0 },
-          { cantidad: { lte: prisma.stockSucursal.fields.minimo as any } },
-        ],
-      },
-      include: {
-        producto: { select: { nombre: true, tipoUnidad: true } },
-      },
-      orderBy: { cantidad: 'asc' },
-    });
+    const criticos = await prisma.$queryRaw<StockBajoSucursalRow[]>`
+      SELECT
+        ss.producto_id AS "productoId",
+        ss.cantidad,
+        ss.minimo,
+        p.nombre,
+        p.tipo_unidad AS "tipoUnidad"
+      FROM stock_sucursal ss
+      INNER JOIN productos p ON p.id = ss.producto_id
+      WHERE ss.sucursal_id = ${sucursalId}
+        AND p.activo = ${true}
+        AND (ss.cantidad = 0 OR ss.cantidad <= ss.minimo)
+      ORDER BY ss.cantidad ASC
+    `;
 
-    return res.json(criticos.map((c: any) => ({
+    return res.json(criticos.map(c => ({
       id:         c.productoId,
-      nombre:     c.producto.nombre,
-      tipoUnidad: c.producto.tipoUnidad,
+      nombre:     c.nombre,
+      tipoUnidad: c.tipoUnidad,
       cantidad:   c.cantidad,
       minimo:     c.minimo,
       estado:     c.cantidad === 0 ? 'critico' : 'bajo',
