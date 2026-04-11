@@ -5,7 +5,7 @@
  */
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { prisma }          from '../../db/prisma/prisma.client';
 import { logPendiente }    from '../../sync/sync.service';
 import { sincronizarStockTotal } from './inventario.routes';

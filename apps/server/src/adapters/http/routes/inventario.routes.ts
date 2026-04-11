@@ -117,7 +117,7 @@ inventarioRoutes.get('/criticos/:sucursalId', async (req: Request, res: Response
       ORDER BY ss.cantidad ASC
     `;
 
-    const criticos = criticosRows.map(c => ({
+    const criticos = criticosRows.map((c: CriticoSucursalRow) => ({
       id: c.id,
       productoId: c.productoId,
       sucursalId: c.sucursalId,
@@ -278,8 +278,8 @@ inventarioRoutes.get(
         orderBy: { nombre: 'asc' },
       });
 
-      const resultado = productos.map(p => {
-        const sucursales = p.stocks.map(s => ({
+      const resultado = productos.map((p: any) => {
+        const sucursales = p.stocks.map((s: any) => ({
           sucursalId:     s.sucursalId,
           sucursalNombre: s.sucursal.nombre,
           cantidad:       s.cantidad,
@@ -290,7 +290,7 @@ inventarioRoutes.get(
                                       'disponible',
         }));
 
-        const stockTotal = sucursales.reduce((acc, s) => acc + s.cantidad, 0);
+        const stockTotal = sucursales.reduce((acc: number, s: { cantidad: number }) => acc + s.cantidad, 0);
 
         return {
           id:           p.id,
