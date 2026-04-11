@@ -21,15 +21,16 @@ import { proveedoresRoutes }  from './adapters/http/routes/proveedores.routes';
 const app = express();
 const branchId = process.env.BRANCH_ID || '1';
 
-// Helmet configura headers de seguridad HTTP automáticamente
 app.use(helmet());
 
-// CORS restringido a dominios conocidos
 const ALLOWED_ORIGINS = [
   'https://ferred.netlify.app',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:4173',
 ];
 
 app.use(cors({
@@ -43,7 +44,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Rate limiting en login
 const loginLimiter = rateLimit({
   windowMs:        60 * 1000,
   max:             10,
@@ -52,11 +52,9 @@ const loginLimiter = rateLimit({
   message:         { error: 'Demasiados intentos de inicio de sesión. Intentá de nuevo en 1 minuto.' },
 });
 
-// Rutas públicas
 app.use('/api/auth', loginLimiter, authRoutes);
 app.get('/health', (_req, res) => res.json({ ok: true, branch: branchId }));
 
-// Rutas protegidas con JWT
 app.use(jwtMiddleware);
 app.use('/api/usuarios',    usuarioRoutes);
 app.use('/api/categorias',  categoriaRoutes);
